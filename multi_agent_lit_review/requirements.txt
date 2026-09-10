@@ -1,0 +1,6 @@
+requests
+python-docx
+python-pptx
+matplotlib
+google-generativeai
+python-dotenv

@@ -1,0 +1,15 @@
+{
+    "last_run_timestamp": "2026-09-09T06:55:12.928100",
+    "last_rmse_prey": 19.694191255677826,
+    "last_rmse_predator": 25.126051345740418,
+    "last_avg_rmse": 22.410121300709122,
+    "last_fitted_parameters": {
+        "alpha": 1.0609163989529165,
+        "beta": 0.13565568978561698,
+        "delta": 0.041884848344682396,
+        "gamma": 1.4061264384856018
+    },
+    "data_point_count": 19,
+    "fit_quality": "poor",
+    "model_name": "base Lotka-Volterra"
+}
