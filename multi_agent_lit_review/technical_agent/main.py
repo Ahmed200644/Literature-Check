@@ -1,7 +1,14 @@
 import sys
+import os
 import argparse
 import schedule
 import time
+from pathlib import Path
+
+CURRENT_DIR = Path(__file__).resolve().parent
+if str(CURRENT_DIR) not in sys.path:
+    sys.path.insert(0, str(CURRENT_DIR))
+
 from agents import (
     UnderstandingAgent,
     ModelSelectionAgent,
@@ -30,7 +37,7 @@ if __name__ == "__main__":
         "missing_info": []
     }
 
-    loop_agent = TechnicalAILoopAgent(understanding_real, data_file="population_data.json")
+    loop_agent = TechnicalAILoopAgent(understanding_real, data_file=str(CURRENT_DIR / "population_data.json"))
 
     if args.schedule:
         print("Starting TechnicalAILoopAgent in continuous scheduled mode (re-checking every 30 days)...")

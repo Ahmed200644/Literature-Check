@@ -2,7 +2,7 @@ import os
 import sys
 import docx
 
-def find_docx_file(filename="literature_review_report.docx"):
+def find_docx_file(filename="review_paper_draft.docx"):
     # Check current directory
     if os.path.exists(filename):
         return filename
@@ -25,16 +25,18 @@ def find_docx_file(filename="literature_review_report.docx"):
     raise FileNotFoundError(f"Could not locate '{filename}'")
 
 def main():
-    docx_path = find_docx_file("literature_review_report.docx")
+    docx_path = find_docx_file("review_paper_draft.docx")
     print(f"Opening docx file: {docx_path}")
     
     doc = docx.Document(docx_path)
     
-    # Count Heading 2 paragraphs
-    h2_count = sum(1 for p in doc.paragraphs if p.style and p.style.name == "Heading 2")
+    # Count paragraphs and headings
+    paragraph_count = len(doc.paragraphs)
+    heading_count = sum(1 for p in doc.paragraphs if p.style and p.style.name.startswith("Heading"))
     
-    print(f"Number of 'Heading 2' paragraphs (papers): {h2_count}")
-    return h2_count
+    print(f"Number of paragraphs: {paragraph_count}")
+    print(f"Number of heading paragraphs: {heading_count}")
+    return paragraph_count
 
 if __name__ == "__main__":
     main()

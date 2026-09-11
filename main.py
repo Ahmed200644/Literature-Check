@@ -3,9 +3,12 @@ import sys
 import argparse
 from pathlib import Path
 
-CURRENT_DIR = Path(__file__).resolve().parent
-if str(CURRENT_DIR) not in sys.path:
-    sys.path.insert(0, str(CURRENT_DIR))
+# Add project directory dynamically to sys.path
+PROJECT_ROOT = Path(__file__).resolve().parent
+LIT_REVIEW_DIR = PROJECT_ROOT / "multi_agent_lit_review"
+
+if str(LIT_REVIEW_DIR) not in sys.path:
+    sys.path.insert(0, str(LIT_REVIEW_DIR))
 
 from agents import AILoopAgent, generate_charts
 
@@ -44,7 +47,7 @@ def main():
         queries=queries,
         history_file="literature_history.json",
         state_file=STATE_FILE,
-        output_dir=str(CURRENT_DIR),
+        output_dir=str(LIT_REVIEW_DIR),
         target_paper_count=50
     )
 
