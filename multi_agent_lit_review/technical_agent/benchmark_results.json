@@ -1,0 +1,42 @@
+{
+  "1_traditional_manual_fitting": {
+    "architecture": "1. Traditional / Baseline Numerical Fitting",
+    "rmse_prey": 17.9675,
+    "rmse_predator": 25.6262,
+    "avg_rmse": 21.7968,
+    "parameter_error_pct": 44.06,
+    "runtime_seconds": 12.8676,
+    "convergence_success": false,
+    "note": "Baseline SciPy Nelder-Mead optimization"
+  },
+  "2_single_pass_baseline": {
+    "architecture": "2. Single-Pass Initial Guess Baseline",
+    "rmse_prey": 29.7692,
+    "rmse_predator": 25.4972,
+    "avg_rmse": 27.6332,
+    "parameter_error_pct": 0.0,
+    "runtime_seconds": 0.116,
+    "convergence_success": true,
+    "note": "Fixed single-pass literature initial guess without optimization"
+  },
+  "3_single_agent_script": {
+    "architecture": "3. Single-Agent Python Script",
+    "rmse_prey": 17.4788,
+    "rmse_predator": 12.6494,
+    "avg_rmse": 15.0641,
+    "parameter_error_pct": 47.94,
+    "runtime_seconds": 11.4753,
+    "convergence_success": true,
+    "note": "Single Powell optimization script"
+  },
+  "4_specialist_multi_agent_system": {
+    "architecture": "4. Specialist Multi-Agent System",
+    "rmse_prey": 19.6942,
+    "rmse_predator": 25.1261,
+    "avg_rmse": 22.4101,
+    "parameter_error_pct": 23.04,
+    "runtime_seconds": 33.5133,
+    "convergence_success": true,
+    "note": "Full TechnicalAILoopAgent pipeline (ModelSelection + Fitting + Simulation + Critique)"
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "last_run_timestamp": "2026-09-11T10:15:55.232616",
+  "last_run_timestamp": "2026-09-11T14:24:29.365506",
   "already_seen_dois": [
     "10.1007/978-3-031-74209-5_26",
     "10.1007/978-3-032-17542-7_7",
@@ -95,5 +95,5 @@
     "token cost optimization in an llm agent for json-based system modeling from dialogue history",
     "toward industry 6.0: the ecosystem age, superintelligence, viability, and or-ai symbiosis"
   ],
-  "total_historical_papers": 41
+  "total_historical_papers": 50
 }

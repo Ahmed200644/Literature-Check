@@ -1,14 +1,16 @@
 from typing import List, Dict, Any, Set, Tuple
 from tools.deduplication import deduplicate_papers, normalize_doi, normalize_string
 from tools.metadata import validate_paper_metadata, evaluate_paper_relevance
+from tools.cross_validation import verify_paper_cross_validation
 
 class ValidationAgent:
     """
     ValidationAgent: Specialist agent responsible for metadata validation,
     cross-validation, deduplication against historical state, and relevance verification.
     """
-    def __init__(self, research_question: str = None):
+    def __init__(self, research_question: str = None, run_live_cross_validation: bool = True):
         self.research_question = research_question
+        self.run_live_cross_validation = run_live_cross_validation
 
     def validate_batch(
         self,
@@ -40,6 +42,7 @@ class ValidationAgent:
         already_seen_count = 0
         metadata_failed_count = 0
         relevance_failed_count = 0
+        cross_val_verified_count = 0
 
         print(f"[ValidationAgent] Processing {total_candidates} raw candidates ({duplicate_count} in-batch duplicates removed)...")
 
@@ -79,11 +82,24 @@ class ValidationAgent:
                 rejected_papers.append(p)
                 continue
 
+            # Step 3: Perform transparent cross-validation (OpenAlex & Crossref)
+            if self.run_live_cross_validation:
+                xv_res = verify_paper_cross_validation(p, timeout=3.0)
+                p["cross_validation_status"] = xv_res["cross_validation_status"]
+                p["cross_validation_details"] = xv_res
+                p["validated_openalex"] = xv_res["openalex_validated"]
+                p["validated_crossref"] = xv_res["crossref_validated"]
+                if xv_res["cross_validation_status"] in ["verified", "partially_verified"]:
+                    cross_val_verified_count += 1
+            else:
+                p["cross_validation_status"] = "unavailable"
+                p["cross_validation_details"] = {"reason": "Cross-validation disabled or offline"}
+                p["validated_openalex"] = False
+                p["validated_crossref"] = False
+
             # If all checks pass
             p["validated"] = True
             p["validation_status"] = "validated"
-            p["validated_openalex"] = True
-            p["validated_crossref"] = True
             validated_papers.append(p)
 
         summary = {
@@ -92,12 +108,13 @@ class ValidationAgent:
             "already_seen_historical_filtered": already_seen_count,
             "metadata_failures": metadata_failed_count,
             "relevance_failures": relevance_failed_count,
+            "cross_val_verified_count": cross_val_verified_count,
             "validated_count": len(validated_papers),
             "rejected_count": len(rejected_papers),
             "needs_review_count": len(needs_review_papers)
         }
 
-        print(f"[ValidationAgent Cross-Validation Summary] Validated: {len(validated_papers)} | Filtered (Already Seen): {already_seen_count} | Rejected: {len(rejected_papers)}")
+        print(f"[ValidationAgent Cross-Validation Summary] Validated: {len(validated_papers)} | Cross-Val Verified: {cross_val_verified_count} | Filtered (Already Seen): {already_seen_count} | Rejected: {len(rejected_papers)}")
 
         return {
             "status": "success",
@@ -106,3 +123,4 @@ class ValidationAgent:
             "needs_review_papers": needs_review_papers,
             "summary": summary
         }
+

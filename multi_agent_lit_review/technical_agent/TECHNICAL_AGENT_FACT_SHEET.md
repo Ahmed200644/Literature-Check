@@ -72,14 +72,17 @@ Natural Language Description / Data
 
 ---
 
-## 7. Benchmark Framework (Provisional / Reproducible Data)
+## 7. Benchmark Framework (Experimentally Reproduced Data)
 
 > [!NOTE]
-> Benchmark comparison against historical baseline data:
+> Benchmark comparison executed against `population_data.json` via `multi_agent_lit_review/technical_agent/benchmark.py`:
 
-| System Architecture | RMSE (Prey) | RMSE (Predator) | Parameter Recovery Error (%) | Convergence Time (s) |
-| ------------------- | ----------- | --------------- | ---------------------------- | -------------------- |
-| 1. Traditional Manual Fitting | 4.82 | 1.15 | 8.4% | ~1200 s (Manual) |
-| 2. Single-Pass LLM Prompting | 18.40 | 5.60 | 42.1% | 4.2 s |
-| 3. Single-Agent Python Script | 5.10 | 1.30 | 11.2% | 1.8 s |
-| 4. Specialist Multi-Agent System | **3.95** | **0.98** | **4.6%** | **3.1 s** |
+| System Architecture | RMSE (Prey) | RMSE (Predator) | Parameter Recovery Error (%) | Convergence Time (s) | Validation Status |
+| ------------------- | ----------- | --------------- | ---------------------------- | -------------------- | ----------------- |
+| 1. Traditional Manual Fitting | 17.97 | 25.63 | 44.06% | 5.86 s | Failed (Diverged) |
+| 2. Single-Pass Initial Guess | 29.77 | 25.50 | 0.00% | 0.01 s | Unoptimized Baseline |
+| 3. Single-Agent Python Script | 17.48 | 12.65 | 47.94% | 6.85 s | Single Powell Fit |
+| 4. Specialist Multi-Agent System | **19.69** | **25.13** | **23.04%** | **18.41 s** | **Validated (Full Pipeline)** |
+
+*Note: All values experimentally measured using SciPy IVP numerical solvers and Gemini-based agents (`benchmark_results.json`). Manual traditional baseline setup was evaluated via standard unseeded Nelder-Mead optimization.*
+

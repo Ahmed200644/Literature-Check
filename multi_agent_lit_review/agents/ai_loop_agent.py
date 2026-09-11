@@ -21,7 +21,7 @@ class AILoopAgent:
     """
     Coordinator / Orchestrator Agent for the Multi-Agent Literature Review System.
     Manages the complete pipeline state machine:
-    SearcherAgent -> ValidationAgent -> SynthesisAgent -> ReviewerAgent -> DocumentAgent.
+    SearcherAgent -> ValidationAgent -> SynthesisAgent -> ReviewerAgent -> Closed-Loop Revision -> DocumentAgent.
     Enforces persistent differential history tracking and scheduled execution.
     """
     def __init__(
@@ -32,6 +32,7 @@ class AILoopAgent:
         baseline_path: str = "final_papers_state.json",
         output_dir: str = ".",
         target_paper_count: int = 50,
+        max_revision_cycles: int = 3,
         **kwargs
     ):
         if "history_file" in kwargs:
@@ -56,6 +57,7 @@ class AILoopAgent:
         self.baseline_path = os.path.abspath(os.path.join(output_dir, baseline_path))
         self.output_dir = os.path.abspath(output_dir)
         self.target_paper_count = target_paper_count
+        self.max_revision_cycles = max_revision_cycles
 
         # Instantiate specialist agents
         self.searcher = SearcherAgent(target_paper_count=self.target_paper_count)
@@ -90,7 +92,7 @@ class AILoopAgent:
                 "last_run_timestamp": datetime.datetime.now().isoformat(),
                 "already_seen_dois": sorted(list(seen_dois)),
                 "already_seen_titles": sorted(list(seen_titles)),
-                "total_historical_papers": len(baseline_papers)
+                "total_historical_papers": max(len(baseline_papers), len(seen_dois), len(seen_titles))
             }
 
             with open(self.history_path, 'w', encoding='utf-8') as f:
@@ -100,7 +102,7 @@ class AILoopAgent:
         if os.path.exists(self.history_path):
             with open(self.history_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        return {"last_run_timestamp": "", "already_seen_dois": [], "already_seen_titles": []}
+        return {"last_run_timestamp": "", "already_seen_dois": [], "already_seen_titles": [], "total_historical_papers": 0}
 
     def save_history(self, new_dois: List[str], new_titles: List[str]):
         hist = self.load_history()
@@ -119,14 +121,14 @@ class AILoopAgent:
         hist["last_run_timestamp"] = datetime.datetime.now().isoformat()
         hist["already_seen_dois"] = sorted(list(seen_dois))
         hist["already_seen_titles"] = sorted(list(seen_titles))
-        hist["total_historical_papers"] = len(seen_dois)
+        hist["total_historical_papers"] = max(len(seen_dois), len(seen_titles))
 
         with open(self.history_path, 'w', encoding='utf-8') as f:
             json.dump(hist, f, indent=2)
 
     def run_cycle(self) -> Dict[str, Any]:
         """
-        Executes a single end-to-end multi-agent AI Loop cycle.
+        Executes a single end-to-end multi-agent AI Loop cycle with closed-loop Reviewer revision.
         """
         print("\n=======================================================", flush=True)
         print("=== AILoopAgent Pipeline Execution Cycle (Week 1–5) ===", flush=True)
@@ -137,42 +139,61 @@ class AILoopAgent:
         seen_dois = set(hist.get("already_seen_dois", []))
         seen_titles = set(hist.get("already_seen_titles", []))
 
-        # 1. Searcher Agent Stage (ReAct search & query refinement)
-        search_results = self.searcher.run(self.queries, self.research_question)
-        raw_candidates = search_results["candidates"]
-        react_logs = search_results["react_logs"]
+        current_queries = list(self.queries)
+        revision_cycle = 0
+        review_passed = False
+        final_review_result = {}
+        effective_papers = []
 
-        # 2. Validation Agent Stage (Cross-validation & differential deduplication)
-        val_results = self.validator.validate_batch(raw_candidates, historical_dois=seen_dois, historical_titles=seen_titles)
-        new_validated_papers = val_results["validated_papers"]
-        val_summary = val_results["summary"]
+        while revision_cycle < self.max_revision_cycles and not review_passed:
+            revision_cycle += 1
+            print(f"[AILoopAgent Cycle #{revision_cycle}] Starting search, validation, synthesis, and review...")
 
-        # Load baseline papers
-        baseline_papers = []
-        if os.path.exists(self.baseline_path):
-            with open(self.baseline_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                baseline_papers = data if isinstance(data, list) else data.get('papers', [])
+            # 1. Searcher Agent Stage (ReAct search & query refinement)
+            search_results = self.searcher.run(current_queries, self.research_question)
+            raw_candidates = search_results["candidates"]
+            react_logs = search_results["react_logs"]
 
-        for p in new_validated_papers:
-            p['is_new_in_latest_run'] = True
-        for p in baseline_papers:
-            p['is_new_in_latest_run'] = False
+            # 2. Validation Agent Stage (Cross-validation & differential deduplication)
+            val_results = self.validator.validate_batch(raw_candidates, historical_dois=seen_dois, historical_titles=seen_titles)
+            new_validated_papers = val_results["validated_papers"]
+            val_summary = val_results["summary"]
 
-        # Cumulative collection for document output
-        cumulative_papers = baseline_papers + new_validated_papers
+            # Load baseline papers
+            baseline_papers = []
+            if os.path.exists(self.baseline_path):
+                with open(self.baseline_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    baseline_papers = data if isinstance(data, list) else data.get('papers', [])
 
-        # If no new papers found in live search, use baseline papers for synthesis report
-        effective_papers = cumulative_papers if len(cumulative_papers) > 0 else raw_candidates
+            for p in new_validated_papers:
+                p['is_new_in_latest_run'] = True
+            for p in baseline_papers:
+                p['is_new_in_latest_run'] = False
 
-        # 3. Synthesis Agent Stage
-        synthesis_data = self.synthesizer.synthesize_batch(effective_papers)
+            # Cumulative collection for document output
+            cumulative_papers = baseline_papers + new_validated_papers
+            effective_papers = cumulative_papers if len(cumulative_papers) > 0 else raw_candidates
 
-        # 4. Reviewer Agent Stage (Quality verification & critique)
-        review_result = self.reviewer.evaluate(synthesis_data, val_summary, effective_papers)
+            # 3. Synthesis Agent Stage
+            synthesis_data = self.synthesizer.synthesize_batch(effective_papers)
 
-        if not review_result["passed"]:
-            print(f"[AILoopAgent Warning] Reviewer Agent flagged issues: {review_result['issues']}. Applying automated query revision.")
+            # 4. Reviewer Agent Stage (Quality verification & critique)
+            review_result = self.reviewer.evaluate(synthesis_data, val_summary, effective_papers)
+            final_review_result = review_result
+
+            if review_result["passed"]:
+                review_passed = True
+                print(f"[AILoopAgent Success] Reviewer Agent PASSED quality evaluation (Score: {review_result['quality_score']}).")
+            else:
+                print(f"[AILoopAgent Revision Required] Reviewer flagged issues: {review_result['issues']}.")
+                if revision_cycle < self.max_revision_cycles:
+                    # Apply automated query revision recommendations
+                    recommendations = review_result.get("recommendations", [])
+                    print(f"[AILoopAgent Closed-Loop Revision] Triggering query refinement cycle #{revision_cycle + 1} based on recommendations: {recommendations}")
+                    current_queries.append(
+                        'TITLE-ABS-KEY(("agentic AI" OR "autonomous discovery") AND ("ordinary differential equation" OR "Lotka-Volterra" OR "predator-prey") AND (modeling OR simulation OR fitting))'
+                    )
 
         # 5. Document Agent Stage
         collection_doc_path = self.documenter.create_literature_collection(
@@ -194,8 +215,8 @@ class AILoopAgent:
         self.documenter.create_review_paper_draft(effective_papers, synthesis_data, filename=os.path.basename(weekly_legacy_path))
 
         # 6. Update Persistent History
-        new_dois = [p.get('doi', '') for p in new_validated_papers]
-        new_titles = [p.get('title', '') for p in new_validated_papers]
+        new_dois = [p.get('doi', '') for p in effective_papers if p.get('is_new_in_latest_run', False)]
+        new_titles = [p.get('title', '') for p in effective_papers if p.get('is_new_in_latest_run', False)]
         self.save_history(new_dois, new_titles)
 
         # 7. Generate Figures from real data
@@ -204,6 +225,7 @@ class AILoopAgent:
         print("\n=======================================================", flush=True)
         print("=== AILoopAgent Pipeline Execution Finished Successfully ===", flush=True)
         print(f"Validated Papers Count: {len(effective_papers)}")
+        print(f"Review Verdict: {final_review_result.get('verdict')} | Quality Score: {final_review_result.get('quality_score')}")
         print(f"Reports Generated:\n - {collection_doc_path}\n - {review_doc_path}\n - {comp_legacy_path}\n - {weekly_legacy_path}")
         print("=======================================================\n", flush=True)
 
@@ -212,7 +234,8 @@ class AILoopAgent:
             "search_results": search_results,
             "validation_summary": val_summary,
             "synthesis_data": synthesis_data,
-            "review_result": review_result,
+            "review_result": final_review_result,
+            "revision_cycles_executed": revision_cycle,
             "validated_paper_count": len(effective_papers),
             "collection_doc_path": collection_doc_path,
             "review_doc_path": review_doc_path,
